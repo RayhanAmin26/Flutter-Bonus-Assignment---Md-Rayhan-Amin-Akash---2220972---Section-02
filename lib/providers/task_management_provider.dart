@@ -1,40 +1,89 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_ui_class/models/card_data_model.dart';
+import '../models/task_model.dart';
+import '../models/card_data_model.dart';
 
-class TaskManagementProvider with ChangeNotifier{
+class TaskManagementProvider with ChangeNotifier {
+  final CollectionReference _tasksCollection =
+      FirebaseFirestore.instance.collection('tasks');
 
+  List<CardDataModel> tasks = [];
 
-  List<CardDataModel> tasks = [
-    CardDataModel(title: "Task 1", subtitle: "This is the first task"),
-    CardDataModel(title: "Task 2", subtitle: "This is the second task", icon: Icons.abc_rounded),
-    CardDataModel(title: "Task 3", subtitle: "This is the third task", icon: Icons.account_balance),
-    CardDataModel(title: "Task 4", subtitle: "This is the fourth task", icon: Icons.add),
-    CardDataModel(title: "Task 5", subtitle: "This is the fifth task", icon: Icons.delete),
-    CardDataModel(title: "Task 6", subtitle: "Custom TASK", icon: Icons.edit),
-  ];
+  // ==================== Real-time Stream (Optimized) ====================
+  Stream<List<CardDataModel>> get tasksStream {
+    return _tasksCollection
+        .orderBy('createdAt', descending: true)
+        .limit(50)                    // ← এটা যোগ করা হয়েছে (memory বাঁচাতে)
+        .snapshots()
+        .map((snapshot) {
+      tasks = snapshot.docs.map((doc) {
+        final task = TaskModel.fromFirestore(doc);
 
-  void addTaskExternal(CardDataModel task){
-    tasks.add(task);
-    notifyListeners();  
+        // Subtitle আরও ছোট ও safe করা হয়েছে (memory অনেক কম খাবে)
+        String subtitle = 
+            "Assigned: ${task.assignedTo}\n"
+            "Phone: ${task.phoneNumber}\n"
+            "Desc: ${task.description.length > 80 
+                ? '${task.description.substring(0, 77)}...' 
+                : task.description}";
+
+        return CardDataModel(
+          title: task.title,
+          subtitle: subtitle,
+          icon: Icons.task_alt_rounded,
+        );
+      }).toList();
+
+      return tasks;
+    });
   }
 
-
-  void printTaskCount(){
-    print("Total tasks: ${tasks.length}");
-  }
-
-
-  void addTaskAuto(){
-    tasks.add(
-      CardDataModel(
-        title: "Task ${tasks.length + 1}",
-        subtitle: "This is task ${tasks.length + 1}",
-        icon: Icons.auto_fix_normal
-      )
+  // ==================== Add Task ====================
+  Future<void> addTaskToFirebase({
+    required String title,
+    required String assignedTo,
+    required String phoneNumber,
+    required String password,
+    required String description,
+  }) async {
+    final newTask = TaskModel(
+      id: '',
+      title: title,
+      assignedTo: assignedTo,
+      phoneNumber: phoneNumber,
+      password: password,
+      description: description,
+      createdAt: DateTime.now(),
     );
 
-    print("Added Task ${tasks.length}");
-    print(tasks.last);
-    notifyListeners();
+    await _tasksCollection.add(newTask.toFirestore());
+  }
+
+  // ==================== Delete Task ====================
+  Future<void> deleteTask(String docId) async {
+    await _tasksCollection.doc(docId).delete();
+  }
+
+  // ==================== Delete by Index ====================
+  Future<void> deleteTaskByIndex(int index) async {
+    if (index < 0 || index >= tasks.length) return;
+
+    try {
+      final snapshot = await _tasksCollection
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      if (index < snapshot.docs.length) {
+        final docId = snapshot.docs[index].id;
+        await _tasksCollection.doc(docId).delete();
+      }
+    } catch (e) {
+      debugPrint("❌ Delete Error: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 }

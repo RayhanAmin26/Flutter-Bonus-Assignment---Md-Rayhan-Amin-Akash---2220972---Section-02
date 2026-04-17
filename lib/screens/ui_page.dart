@@ -1,65 +1,68 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_ui_class/data/dummy_data.dart';
-import 'package:flutter_ui_class/models/card_data_model.dart';
-import 'package:flutter_ui_class/providers/task_management_provider.dart';
-import 'package:flutter_ui_class/screens/add_task_page.dart';
-import 'package:flutter_ui_class/widgets/task_card_widget.dart';
 import 'package:provider/provider.dart';
+import '../providers/task_management_provider.dart';
+import '../screens/add_task_page.dart';        // তোমার ফাইলের নাম
+import '../widgets/task_card_widget.dart';
 
-class UiPage extends StatefulWidget {
-  const UiPage({super.key});
+class TaskListPage extends StatefulWidget {
+  const TaskListPage({super.key});
 
   @override
-  State<UiPage> createState() => _UiPageState();
+  State<TaskListPage> createState() => _TaskListPageState();
 }
 
-class _UiPageState extends State<UiPage> {
-
-
-  
-  DummyData dummyDataInstance = DummyData();
-
-
+class _TaskListPageState extends State<TaskListPage> {
   @override
   Widget build(BuildContext context) {
-    print("Building UI Page...");
-    
-
     return Scaffold(
       appBar: AppBar(
-        title: Text("UI PAGE"),
+        title: const Text("IUB Task Manager"),
         backgroundColor: Colors.purpleAccent,
       ),
-
       body: Consumer<TaskManagementProvider>(
-        builder: (context, taskProvider, _) {
+        builder: (context, taskProvider, child) {
           return RefreshIndicator(
-              onRefresh: () async {
-                setState(() {});
-              },
-            child: ListView.builder(
-              padding: EdgeInsets.all(16),
-              itemCount: taskProvider.tasks.length,
-              itemBuilder: (context, index) {
-                final task = taskProvider.tasks[index];
-            
-                return TaskCardWidget(
-                  title: task.title,
-                  subtitle: task.subtitle,
-                  icon: task.icon,
-                );
-              },
-            ),
+            onRefresh: () async {
+              // Stream নিজে আপডেট করে, তাই খালি রাখলাম
+              await Future.delayed(const Duration(milliseconds: 300));
+            },
+            child: taskProvider.tasks.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.task_alt_rounded, size: 80, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text("No tasks yet", style: TextStyle(fontSize: 18)),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: taskProvider.tasks.length,
+                    itemBuilder: (context, index) {
+                      final task = taskProvider.tasks[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: TaskCardWidget(
+                          title: task.title,
+                          subtitle: task.subtitle,
+                          icon: task.icon,
+                        ),
+                      );
+                    },
+                  ),
           );
-        }
+        },
       ),
-
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.of(context)
-          .push(MaterialPageRoute(builder: (context) => AddTaskPage()));
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddTaskPage()),
+          );
         },
-        child: Icon(Icons.add),
+        child: const Icon(Icons.add),
         backgroundColor: Colors.purpleAccent,
       ),
     );
